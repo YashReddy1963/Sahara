@@ -4,7 +4,7 @@ import {
   TableCellsIcon,
   InformationCircleIcon,
 } from "@heroicons/react/24/solid";
-import { Home, Profile, Tables, Notifications } from "@/pages/dashboard";
+import { Stats, Profile, Tables, Notifications } from "@/pages/dashboard";
 
 const icon = {
   className: "w-5 h-5 text-inherit",
@@ -16,9 +16,9 @@ export const routes = [
     pages: [
       {
         icon: <HomeIcon {...icon} />,
-        name: "dashboard",
-        path: "/home",
-        element: <Home />,
+        name: "stats",
+        path: "/stats",
+        element: <Stats />,
       },
       {
         icon: <UserCircleIcon {...icon} />,
