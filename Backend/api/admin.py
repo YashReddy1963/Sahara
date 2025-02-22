@@ -4,14 +4,17 @@ from .models import CustomUser
 
 class CustomUserAdmin(UserAdmin):
     model = CustomUser
-    list_display = ('email', 'username', 'gender', 'is_ngo', 'otp_verified')
-    list_filter = ('gender', 'is_ngo', 'otp_verified', 'is_staff', 'is_active')
+    list_display = ('email', 'username', 'otp_verified', 'is_staff', 'is_active')  # Added 'is_staff' and 'is_active'
+    list_filter = ('otp_verified', 'is_staff', 'is_active')
+
     fieldsets = (
-        (None, {'fields': ('email', 'username', 'password')}),
-        ('Personal Info', {'fields': ('contact_number', 'gender')}),
-        ('OTP Verification', {'fields': ('otp_code', 'otp_verified')}),
-        ('Permissions', {'fields': ('is_ngo', 'is_staff', 'is_active')}),
-    )
+    (None, {'fields': ('email', 'username', 'password')}),
+    ('Personal Info', {'fields': ('contact_number', 'profile_picture')}),
+    ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),  
+    ('OTP Verification', {'fields': ('otp_verified', 'otp_code')}),
+)
+
+
 
     search_fields = ('email', 'username')
     ordering = ('email',)

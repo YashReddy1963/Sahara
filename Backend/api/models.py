@@ -3,19 +3,16 @@ from django.db import models
 import random
 from django.conf import settings
 from django.utils.timezone import now
+from django.db import models
+from django.contrib.auth.hashers import make_password
 
 
 class CustomUser(AbstractUser):
-    GENDER_CHOICES = [
-        ('Male', 'Male'),
-        ('Female', 'Female'),
-        ('Other', 'Other'),
-    ]
+
 
     email = models.EmailField(unique=True)
-    is_ngo = models.BooleanField(default=False)  # True if the user is an NGO
     contact_number = models.CharField(max_length=15, null=True, blank=True)
-    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, null=True, blank=True)
+    profile_picture = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)
     otp_code = models.CharField(max_length=6, blank=True, null=True)
     otp_verified = models.BooleanField(default=False)
 
@@ -27,10 +24,14 @@ class CustomUser(AbstractUser):
 
     def generate_otp(self):
         """Generate and store a 6-digit OTP"""
+        import random
         self.otp_code = str(random.randint(100000, 999999))
         self.save()
         return self.otp_code
 
+
+class Meta:
+        db_table = "api_customuser"
 
 class FundRequest(models.Model):
     STATUS_CHOICES = [
@@ -49,6 +50,7 @@ class FundRequest(models.Model):
         return f"{self.user.username} - {self.amount_requested} - {self.status}"
 
 
+
 class FundPost(models.Model):
     ngo = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, limit_choices_to={'is_ngo': True})
     fund_request = models.OneToOneField("FundRequest", on_delete=models.CASCADE)
@@ -57,9 +59,35 @@ class FundPost(models.Model):
     target_amount = models.DecimalField(max_digits=10, decimal_places=2)
     collected_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     image = models.ImageField(upload_to="fund_images/", blank=True, null=True)
-    video = models.FileField(upload_to="fund_videos/", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
- 
+
+class NGORegistration(models.Model):
+    organization_name = models.CharField(max_length=255)
+    official_email = models.EmailField(unique=True)
+    address = models.TextField()
+    type_of_ngo = models.CharField(max_length=255)
+    government_issued_id = models.FileField(upload_to='ngo_docs/')
+    social_link = models.URLField(blank=True, null=True)
+    contact_number = models.CharField(max_length=20)
+    password = models.CharField(max_length=128) 
+    organization_authority_name = models.CharField(max_length=255)
+    profile_picture = models.ImageField(upload_to='ngo_profiles/')
+    password = models.CharField(max_length=255)
+    extra_field_1 = models.CharField(max_length=255, blank=True, null=True)
+    extra_field_2 = models.CharField(max_length=255, blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        if not self.password.startswith('pbkdf2_'):  # Prevent re-hashing if already hashed
+            self.password = make_password(self.password)
+        super().save(*args, **kwargs)
+    
+    # ✅ Fix: Ensure `created_at` is automatically set
+    created_at = models.DateTimeField(default=now, blank=True)
+    def __str__(self):
+        return self.organization_name
+
+# ✅ Use a string reference to avoid circular import issues
+
 
 class Transaction(models.Model):
     donor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="transactions")
