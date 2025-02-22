@@ -43,24 +43,24 @@ from .models import FundPost, FundRequest
 from django.contrib.auth import get_user_model
 
 
-User = get_user_model()  # Get the custom User model
+User = get_user_model()  
 
 @method_decorator(csrf_exempt, name='dispatch')
 @method_decorator(login_required, name='dispatch')
 class CreateFundPostView(View):
     def post(self, request):
         try:
-            # Check user authentication
+            # User authentication
             if not request.user.is_authenticated:
                 return JsonResponse({"error": "Authentication required"}, status=401)
 
             data = json.loads(request.body)
 
-            ngo_id = data.get("id")  # NGO ID should be passed
+            ngo_id = data.get("id")  
             title = data.get("title")
             description = data.get("description")
             target_amount = data.get("target_amount")
-            image = request.FILES.get("image")  # Handle file uploads properly
+            image = request.FILES.get("image")  
 
             # Validate required fields
             if not all([title, description, target_amount]):
@@ -79,13 +79,13 @@ class CreateFundPostView(View):
 
             # Create Fund Post
             fund_post = FundPost.objects.create(
-                user=request.user,  # Logged-in user
-                ngo=ngo,  # Pass the User instance
+                user=request.user,  
+                ngo=ngo,  
                 title=title,
                 description=description,
                 target_amount=target_amount,
-                image=image,  # Handle image properly
-            )
+                image=image, 
+                )
 
             return JsonResponse({
                 "message": "Fund post created successfully!",
