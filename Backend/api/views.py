@@ -7,7 +7,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from .models import CustomUser
-from .models import Donation, FundPost
+from .models import Donation, FundPost, models
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login
 from django.http import JsonResponse
@@ -20,6 +20,83 @@ import random
 from django.core.mail import send_mail
 from django.contrib.auth.hashers import make_password
 
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+from django.core.exceptions import ObjectDoesNotExist
+from django.contrib.auth.decorators import login_required
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .models import FundPost
+
+import json
+from django.http import JsonResponse
+from django.views import View
+from django.core.exceptions import ObjectDoesNotExist
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+from django.contrib.auth.decorators import login_required
+from django.conf import settings
+from .models import FundPost, FundRequest
+
+from django.contrib.auth import get_user_model
+
+
+User = get_user_model()  # Get the custom User model
+
+@method_decorator(csrf_exempt, name='dispatch')
+@method_decorator(login_required, name='dispatch')
+class CreateFundPostView(View):
+    def post(self, request):
+        try:
+            # Check user authentication
+            if not request.user.is_authenticated:
+                return JsonResponse({"error": "Authentication required"}, status=401)
+
+            data = json.loads(request.body)
+
+            ngo_id = data.get("id")  # NGO ID should be passed
+            title = data.get("title")
+            description = data.get("description")
+            target_amount = data.get("target_amount")
+            image = request.FILES.get("image")  # Handle file uploads properly
+
+            # Validate required fields
+            if not all([title, description, target_amount]):
+                return JsonResponse({"error": "All fields are required."}, status=400)
+
+            # Fetch the NGO user
+            if ngo_id:
+                try:
+                    ngo = User.objects.get(id=ngo_id, is_ngo=True)
+                except User.DoesNotExist:
+                    return JsonResponse({"error": "NGO not found or invalid"}, status=404)
+            else:
+                ngo = User.objects.filter(is_ngo=True).first()
+                if not ngo:
+                    return JsonResponse({"error": "No NGO available for testing"}, status=400)
+
+            # Create Fund Post
+            fund_post = FundPost.objects.create(
+                user=request.user,  # Logged-in user
+                ngo=ngo,  # Pass the User instance
+                title=title,
+                description=description,
+                target_amount=target_amount,
+                image=image,  # Handle image properly
+            )
+
+            return JsonResponse({
+                "message": "Fund post created successfully!",
+                "fund_post_id": fund_post.id
+            }, status=201)
+
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON format"}, status=400)
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
 
 @csrf_exempt
 def register_user(request):
@@ -191,42 +268,74 @@ def donate(request):
 
 
 
-@csrf_exempt
-@login_required
-def create_fund_post(request):
-    if request.method == "POST":
-        ngo = request.user  # Ensure the user is logged in
-        
-        if not ngo.is_authenticated:
-            return JsonResponse({"error": "User not authenticated."}, status=401)
 
-        if not ngo.is_ngo:  # Assuming you have a field to check NGO role
-            return JsonResponse({"error": "Only NGOs can create fund posts."}, status=403)
 
-        title = request.POST.get("title")
-        description = request.POST.get("description")
-        goal_amount = request.POST.get("goal_amount")
-        image = request.FILES.get("image")
-        video = request.FILES.get("video")
 
-        if not title or not description or not goal_amount:
-            return JsonResponse({"error": "Title, description, and goal amount are required."}, status=400)
 
-        fund_post = FundPost.objects.create(
-            ngo=ngo,
-            title=title,
-            description=description,
-            goal_amount=goal_amount,
-            image=image,
-            video=video
-        )
 
-        return JsonResponse({
-            "message": "Fund post created successfully!",
-            "fund_post_id": fund_post.id
-        }, status=201)
 
-    return JsonResponse({"error": "Invalid request method."}, status=405)
+
+
+# class FundPostListView(View):
+#     def get(self, request):
+#         fund_posts = FundPost.objects.all().values(
+#             "id", "title", "description", "target_amount", "collected_amount", "image", "created_at"
+#         )
+#         return JsonResponse(list(fund_posts), safe=False)
+
+
+# class FundPostDetailView(View):
+#     def get(self, request, fund_post_id):
+#         try:
+#             fund_post = FundPost.objects.get(id=fund_post_id)
+#             return JsonResponse({
+#                 "id": fund_post.id,
+#                 "title": fund_post.title,
+#                 "description": fund_post.description,
+#                 "target_amount": str(fund_post.target_amount),
+#                 "collected_amount": str(fund_post.collected_amount),
+#                 "image": fund_post.image.url if fund_post.image else None,
+#                 "created_at": fund_post.created_at.strftime("%Y-%m-%d %H:%M:%S")
+#             })
+#         except ObjectDoesNotExist:
+#             return JsonResponse({"error": "Fund post not found"}, status=404)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+@method_decorator(login_required, name='dispatch')
+class FundPostUpdateView(View):
+    def put(self, request, fund_post_id):
+        try:
+            fund_post = FundPost.objects.get(id=fund_post_id, ngo=request.user)
+        except ObjectDoesNotExist:
+            return JsonResponse({"error": "Fund post not found or unauthorized"}, status=403)
+
+        try:
+            data = json.loads(request.body)
+            fund_post.title = data.get("title", fund_post.title)
+            fund_post.description = data.get("description", fund_post.description)
+            fund_post.target_amount = data.get("target_amount", fund_post.target_amount)
+            fund_post.collected_amount = data.get("collected_amount", fund_post.collected_amount)
+            fund_post.save()
+
+            return JsonResponse({"message": "Fund post updated successfully!"})
+
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON format"}, status=400)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+@method_decorator(login_required, name='dispatch')
+class FundPostDeleteView(View):
+    def delete(self, request, fund_post_id):
+        try:
+            fund_post = FundPost.objects.get(id=fund_post_id, ngo=request.user)
+        except ObjectDoesNotExist:
+            return JsonResponse({"error": "Fund post not found or unauthorized"}, status=403)
+
+        fund_post.delete()
+        return JsonResponse({"message": "Fund post deleted successfully!"}, status=204)
+
 
 
 def ngo_stats(request, ngo_id):
