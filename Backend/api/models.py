@@ -29,7 +29,7 @@ class CustomUser(AbstractUser):
 
 class NGORegistration(models.Model):
     organization_name = models.CharField(max_length=255)
-    official_email = models.EmailField(unique=True)
+    email = models.EmailField(unique=True)
     address = models.TextField()
     type_of_ngo = models.CharField(max_length=255)
     government_issued_id = models.TextField()

@@ -197,7 +197,7 @@ def login_view(request):
                     "email": user.email,
                     "access_token": str(refresh.access_token),
                     "refresh_token": str(refresh),
-                    "redirect_url": "/user-dashboard"  # Redirect user
+                    "redirect_url": "/discover/home" 
                 }, status=200)
 
             # Check in NgoRegistration table
@@ -211,7 +211,7 @@ def login_view(request):
                     "email": ngo_user.email,
                     "access_token": str(refresh.access_token),
                     "refresh_token": str(refresh),
-                    "redirect_url": "/ngo-dashboard"  # Redirect NGO user
+                    "redirect_url": "/dashboard/stats"  # Redirect NGO user
                 }, status=200)
 
             return JsonResponse({"error": "Invalid credentials"}, status=401)
