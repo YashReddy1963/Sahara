@@ -122,7 +122,7 @@ DATABASES = {
         'PASSWORD': 'priti',
         'HOST': 'localhost',
         'PORT': '5432',
-    }
+    },
 }
 
 
