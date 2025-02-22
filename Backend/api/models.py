@@ -3,22 +3,21 @@ from django.db import models
 import random
 from django.conf import settings
 from django.utils.timezone import now
+from django.db import models
+from django.contrib.auth.hashers import make_password
 
 import uuid
 
 
 
+
+
 class CustomUser(AbstractUser):
-    GENDER_CHOICES = [
-        ('Male', 'Male'),
-        ('Female', 'Female'),
-        ('Other', 'Other'),
-    ]
+
 
     email = models.EmailField(unique=True)
-    is_ngo = models.BooleanField(default=False)  # True if the user is an NGO
     contact_number = models.CharField(max_length=15, null=True, blank=True)
-    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, null=True, blank=True)
+    profile_picture = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)
     otp_code = models.CharField(max_length=6, blank=True, null=True)
     otp_verified = models.BooleanField(default=False)
 
@@ -30,10 +29,14 @@ class CustomUser(AbstractUser):
 
     def generate_otp(self):
         """Generate and store a 6-digit OTP"""
+        import random
         self.otp_code = str(random.randint(100000, 999999))
         self.save()
         return self.otp_code
 
+
+class Meta:
+        db_table = "api_customuser"
 
 class FundRequest(models.Model):
     STATUS_CHOICES = [
@@ -74,6 +77,7 @@ class FundPost(models.Model):
         blank=True  
     )
 
+    ngo_name=models.CharField(max_length=255, null=True, blank=True)
     title = models.CharField(max_length=255, null=True, blank=True)
     description = models.TextField()
     target_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
@@ -85,6 +89,30 @@ class FundPost(models.Model):
         return f"{self.title} - {self.ngo.username}"
 
  
+class NGORegistration(models.Model):
+    organization_name = models.CharField(max_length=255)
+    official_email = models.EmailField(unique=True)
+    address = models.TextField()
+    type_of_ngo = models.CharField(max_length=255)
+    government_issued_id = models.CharField(max_length=255, null=True, blank=True)
+    social_link = models.URLField(blank=True, null=True)
+    contact_number = models.CharField(max_length=20)
+    password = models.CharField(max_length=128 ,null=True , blank=True) 
+    organization_authority_name = models.CharField(max_length=255)
+    profile_picture = models.ImageField(upload_to='ngo_profiles/')
+    extra_field_1 = models.CharField(max_length=255, blank=True, null=True)
+    extra_field_2 = models.CharField(max_length=255, blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        if not self.password.startswith('pbkdf2_'):  
+            self.password = make_password(self.password)
+        super().save(*args, **kwargs)
+    
+   
+    created_at = models.DateTimeField(default=now, blank=True)
+    def _str_(self):
+        return self.organization_name
+
 
 class Transaction(models.Model):
     donor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="transactions")
@@ -116,3 +144,26 @@ class Notification(models.Model):
     message = models.TextField()
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(default=now)
+
+
+
+
+class NGO(models.Model):
+    name = models.CharField(max_length=255)
+    email = models.EmailField(unique=True)
+    contact_number = models.CharField(max_length=20)
+
+    def __str__(self):
+        return self.name
+
+class DailyDonation(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    ngo = models.ForeignKey(NGO, on_delete=models.CASCADE)
+    date = models.DateField(default=now)  # Defaults to current date
+    total_received = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
+
+    class Meta:
+        unique_together = ('ngo', 'date')  # Ensure one entry per day per NGO
+
+    def __str__(self):
+        return f"{self.ngo.name} - {self.date}: {self.total_received}"
