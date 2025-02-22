@@ -23,7 +23,15 @@ export function Discover() {
       />
       <div className="p-4 xl:ml-80">
         <DashboardNavbar />
-        
+        <Routes>
+          {routes2.map(
+            ({ layout, pages }) =>
+              layout === "discover" &&
+              pages.map(({ path, element }) => (
+                <Route exact path={path} element={element} />
+              ))
+          )}
+        </Routes>
       </div>
     </div>
   );

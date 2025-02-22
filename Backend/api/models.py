@@ -5,7 +5,7 @@ from django.conf import settings
 from django.utils.timezone import now
 from django.db import models
 from django.contrib.auth.hashers import make_password
-
+import uuid
 
 class CustomUser(AbstractUser):
     email = models.EmailField(unique=True)
@@ -43,11 +43,10 @@ class NGORegistration(models.Model):
     extra_field_2 = models.CharField(max_length=255, blank=True, null=True)
 
     def save(self, *args, **kwargs):
-        if not self.password.startswith('pbkdf2_'):  # Prevent re-hashing if already hashed
+        if not self.password.startswith('pbkdf2_'): 
             self.password = make_password(self.password)
         super().save(*args, **kwargs)
     
-    # ✅ Fix: Ensure `created_at` is automatically set
     created_at = models.DateTimeField(default=now, blank=True)
     def __str__(self):
         return self.organization_name
@@ -73,17 +72,37 @@ class FundRequest(models.Model):
         return f"{self.user.username} - {self.amount_requested} - {self.status}"
 
 
-
 class FundPost(models.Model):
-    ngo = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, limit_choices_to={'is_ngo': True})
-    fund_request = models.OneToOneField("FundRequest", on_delete=models.CASCADE)
-    title = models.CharField(max_length=255)
-    description = models.TextField()
-    target_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    collected_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    image = models.ImageField(upload_to="fund_images/", blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    id = models.BigAutoField(primary_key=True)  
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)  
+    
+    ngo = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        limit_choices_to={'is_ngo': True},
+        related_name="ngo_fund_posts",  
+        null=True,  
+        blank=True  
+    )
 
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="user_fund_posts",  
+        null=True, 
+        blank=True  
+    )
+
+    ngo_name=models.CharField(max_length=255, null=True, blank=True)
+    title = models.CharField(max_length=255, null=True, blank=True)
+    description = models.TextField()
+    target_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    collected_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, null=True, blank=True)
+    image = models.URLField(max_length=500, blank=True, null=True)  
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+
+    def _str_(self):
+        return f"{self.title} - {self.ngo.username}"
 
 class Transaction(models.Model):
     donor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="transactions")
