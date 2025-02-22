@@ -25,7 +25,6 @@ from django.core.files.base import ContentFile
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password
 
-
 @csrf_exempt
 def register_user(request):
     if request.method == 'POST':
@@ -367,12 +366,6 @@ class NotificationView(View):
         return JsonResponse({"notifications": data}, safe=False)
     
 
-
-
-from django.http import JsonResponse
-from django.views import View
-from django.shortcuts import get_object_or_404
-from .models import FundPost
 
 class FundPostDetailView(View):
     def get(self, request, post_id=None):

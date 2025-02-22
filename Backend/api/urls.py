@@ -22,8 +22,8 @@ urlpatterns = [
     path('donate/', donate, name='donate'),
     path('api/ngo-stats/<int:ngo_id>/', ngo_stats, name="ngo-stats"),
     path("api/notifications/", NotificationView.as_view(), name="notifications"),
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),  # Login (Get Access & Refresh Token)
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),  # Refresh Token
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'), 
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),  
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

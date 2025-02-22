@@ -109,7 +109,7 @@ class Transaction(models.Model):
     fund_post = models.ForeignKey(FundPost, on_delete=models.CASCADE, related_name="transactions")
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_method = models.CharField(max_length=50, choices=[('UPI', 'UPI'), ('Card', 'Card'), ('Net Banking', 'Net Banking')])
-    transaction_id = models.CharField(max_length=100, unique=True)  # Unique transaction reference
+    transaction_id = models.CharField(max_length=100, unique=True) 
     status = models.CharField(max_length=20, choices=[('Pending', 'Pending'), ('Success', 'Success'), ('Failed', 'Failed')], default='Pending')
     created_at = models.DateTimeField(default=now)
 
