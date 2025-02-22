@@ -43,26 +43,24 @@ def register_user(request):
 
             # Check if email already exists
             user = CustomUser.objects.filter(email=email).first()
-            if user:
-                if not user.otp_verified:
-                    otp_code = str(random.randint(100000, 999999))
-                    user.otp_code = otp_code
-                    user.save()
+            #if user:
+            #    if not user.otp_verified:
+            #        otp_code = str(random.randint(100000, 999999))
+            #        user.otp_code = otp_code
+            #        user.save()
 
-                    send_mail(
-                        subject="Your OTP Code",
-                        message=f"Your OTP code is {otp_code}",
-                        from_email="your_email@example.com",
-                        recipient_list=[email],
-                        fail_silently=False,
-                    )
+            #        send_mail(
+            #            subject="Your OTP Code",
+            #            message=f"Your OTP code is {otp_code}",
+            #            from_email="your_email@example.com",
+            #            recipient_list=[email],
+            #            fail_silently=False,
+            #        )
 
-                    return JsonResponse({'message': 'OTP resent. Please verify.'}, status=200)
-
-                return JsonResponse({'error': 'User with this email already exists'}, status=400)
-
+            #        return JsonResponse({'message': 'OTP resent. Please verify.'}, status=200)
+            #    return JsonResponse({'error': 'User with this email already exists'}, status=400)
             # Generate OTP for new user
-            otp_code = str(random.randint(100000, 999999))
+            #otp_code = str(random.randint(100000, 999999))
 
             if profile_picture:
                 picture_path = default_storage.save(f'profile_pictures/{profile_picture.name}', ContentFile(profile_picture.read()))
@@ -74,19 +72,19 @@ def register_user(request):
                 password=make_password(password),
                 contact_number=contact_number,
                 profile_picture=picture_path,  # Fixed variable name
-                otp_code=otp_code,
-                otp_verified=False
+                #otp_code=otp_code,
+                #otp_verified=False
             )
 
-            send_mail(
-                subject="Your OTP Code",
-                message=f"Your OTP code is {otp_code}",
-                from_email="your_email@example.com",
-                recipient_list=[email],
-                fail_silently=False,
-            )
+            #send_mail(
+            #    subject="Your OTP Code",
+            #    message=f"Your OTP code is {otp_code}",
+            #    from_email="your_email@example.com",
+            #    recipient_list=[email],
+            #    fail_silently=False,
+            #)
 
-            return JsonResponse({'message': 'User registered successfully. OTP sent.', 'user_id': user.id}, status=201)
+            return JsonResponse({'message': 'User registered successfully.', 'user_id': user.id}, status=201)
 
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
@@ -116,7 +114,7 @@ def ngo_registration(request):
             extra_field_1 = data.get('extra_field_1', '').strip()
             extra_field_2 = data.get('extra_field_2', '').strip()
 
-            government_issued_id = request.FILES.get('government_issued_id')
+            government_issued_id = data.get('government_issues_id', '')
             profile_picture = request.FILES.get('profile_picture')
 
             # Validate required fields
@@ -131,11 +129,10 @@ def ngo_registration(request):
 
             # Check if NGO with the same email already exists
             if NGORegistration.objects.filter(official_email=official_email).exists():
-                return JsonResponse({'error': 'NGO with this email already exists'}, status=400)
+                return JsonResponse({'error': 'NGO with this email already exists'}, status=400)            
 
-            # Ensure required files are uploaded
-            if not government_issued_id or not profile_picture:
-                return JsonResponse({'error': 'Government-issued ID and profile picture are required'}, status=400)
+            if not profile_picture:
+                return JsonResponse({'error': 'Profile picture are required'}, status=400)
 
 
             hashed_password = make_password(password) 
@@ -156,18 +153,18 @@ def ngo_registration(request):
                 extra_field_2=extra_field_2
             )
 
-            # ✅ Step 1: Generate a 6-digit OTP
-            otp = random.randint(100000, 999999)
+            # Step 1: Generate a 6-digit OTP
+            #otp = random.randint(100000, 999999)
 
-            # ✅ Step 3: Send OTP via email
-            send_mail(
-                'NGO Registration OTP Verification',
-                f'Hello {organization_name},\n\nYour OTP for NGO registration is: {otp}\n\nPlease enter this OTP to verify your NGO registration.',
-                'your-email@example.com',  # Replace with your sender email
-                [official_email],
-                fail_silently=False
-            )
-
+            #sharing opt via email
+           #send_mail(
+           #    'NGO Registration OTP Verification',
+           #    f'Hello {organization_name},\n\nYour OTP for NGO registration is: {otp}\n\nPlease enter this OTP to verify your NGO registration.',
+           #    'your-email@example.com',
+           #    [official_email],
+           #    fail_silently=False
+           #)
+           
             return JsonResponse({'message': 'NGO registered successfully. OTP sent for verification.', 'ngo_id': ngo.id}, status=201)
 
         except Exception as e:
@@ -184,45 +181,40 @@ def login_view(request):
             data = json.loads(request.body)
             email = data.get("email", "").strip().lower()
             password = data.get("password", "").strip()
-            otp_code = data.get("otp_code", "").strip()
 
             if not email or not password:
                 return JsonResponse({"error": "Email and password are required."}, status=400)
 
-            # Authenticate user with email
+            # Check in CustomUser table
             user = CustomUser.objects.filter(email=email).first()
+            if user and user.check_password(password):
+                login(request, user)
+                refresh = RefreshToken.for_user(user)
+                return JsonResponse({
+                    "message": "Login successful",
+                    "user_id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "access_token": str(refresh.access_token),
+                    "refresh_token": str(refresh),
+                    "redirect_url": "/user-dashboard"  # Redirect user
+                }, status=200)
 
-            if user is None or not user.check_password(password):
-                return JsonResponse({"error": "Invalid credentials"}, status=401)
+            # Check in NgoRegistration table
+            ngo_user = NGORegistration.objects.filter(email=email).first()
+            if ngo_user and ngo_user.check_password(password):  # Assuming NgoRegistration has password field
+                refresh = RefreshToken.for_user(ngo_user)
+                return JsonResponse({
+                    "message": "Login successful",
+                    "user_id": ngo_user.id,
+                    "username": ngo_user.username,
+                    "email": ngo_user.email,
+                    "access_token": str(refresh.access_token),
+                    "refresh_token": str(refresh),
+                    "redirect_url": "/ngo-dashboard"  # Redirect NGO user
+                }, status=200)
 
-            # Check OTP verification
-            if not user.otp_verified:
-                if not otp_code:
-                    return JsonResponse({"error": "OTP verification required. Please enter the OTP."}, status=403)
-
-                if otp_code != user.otp_code:
-                    return JsonResponse({"error": "Invalid OTP."}, status=403)
-
-                # Mark OTP as verified
-                user.otp_verified = True
-                user.otp_code = None  # Clear OTP after successful verification
-                user.save()
-
-            # Log the user in
-            login(request, user)
-
-            # Generate JWT tokens
-            refresh = RefreshToken.for_user(user)
-            access_token = str(refresh.access_token)
-
-            return JsonResponse({
-                "message": "Login successful",
-                "user_id": user.id,
-                "username": user.username,
-                "email": user.email,
-                "access_token": access_token,
-                "refresh_token": str(refresh),
-            }, status=200)
+            return JsonResponse({"error": "Invalid credentials"}, status=401)
 
         except json.JSONDecodeError:
             return JsonResponse({"error": "Invalid JSON format"}, status=400)
@@ -230,8 +222,6 @@ def login_view(request):
             return JsonResponse({"error": str(e)}, status=500)
 
     return JsonResponse({"error": "Invalid request method."}, status=405)
-
-
 
 
 

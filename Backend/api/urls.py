@@ -13,16 +13,16 @@ from django.conf import settings
 
 
 urlpatterns = [
-    path('register/', register_user, name='register'),
-    path('donate/', donate, name='donate'),
     path('login/', login_view, name='login'),
+    path('register/', register_user, name='register'),
+    path('api/ngo/register/', ngo_registration, name='ngo_registration'),
+    path('donate/', donate, name='donate'),
     path('fund-posts/create/', create_fund_post, name='create_fund_post'),
     path('api/ngo-stats/<int:ngo_id>/', ngo_stats, name="ngo-stats"),
     path("api/notifications/", NotificationView.as_view(), name="notifications"),
     path("api/fund-posts/<int:post_id>/", FundPostDetailView.as_view(), name="fund_post_detail"),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),  # Login (Get Access & Refresh Token)
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),  # Refresh Token
-    path('api/ngo/register/', ngo_registration, name='ngo_registration'),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

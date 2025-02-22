@@ -8,13 +8,11 @@ from django.contrib.auth.hashers import make_password
 
 
 class CustomUser(AbstractUser):
-
-
     email = models.EmailField(unique=True)
     contact_number = models.CharField(max_length=15, null=True, blank=True)
     profile_picture = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)
-    otp_code = models.CharField(max_length=6, blank=True, null=True)
-    otp_verified = models.BooleanField(default=False)
+    #otp_code = models.CharField(max_length=6, blank=True, null=True)
+    #otp_verified = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
@@ -22,12 +20,37 @@ class CustomUser(AbstractUser):
     def __str__(self):
         return self.email
 
-    def generate_otp(self):
+    #def generate_otp(self):
         """Generate and store a 6-digit OTP"""
-        import random
-        self.otp_code = str(random.randint(100000, 999999))
-        self.save()
-        return self.otp_code
+    #    import random
+    #   self.otp_code = str(random.randint(100000, 999999))
+    #  self.save()
+    # return self.otp_code
+
+class NGORegistration(models.Model):
+    organization_name = models.CharField(max_length=255)
+    official_email = models.EmailField(unique=True)
+    address = models.TextField()
+    type_of_ngo = models.CharField(max_length=255)
+    government_issued_id = models.TextField()
+    social_link = models.URLField(blank=True, null=True)
+    contact_number = models.CharField(max_length=20)
+    password = models.CharField(max_length=128) 
+    organization_authority_name = models.CharField(max_length=255)
+    profile_picture = models.ImageField(upload_to='ngo_profiles/')
+    password = models.CharField(max_length=255)
+    extra_field_1 = models.CharField(max_length=255, blank=True, null=True)
+    extra_field_2 = models.CharField(max_length=255, blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        if not self.password.startswith('pbkdf2_'):  # Prevent re-hashing if already hashed
+            self.password = make_password(self.password)
+        super().save(*args, **kwargs)
+    
+    # ✅ Fix: Ensure `created_at` is automatically set
+    created_at = models.DateTimeField(default=now, blank=True)
+    def __str__(self):
+        return self.organization_name
 
 
 class Meta:
@@ -60,33 +83,6 @@ class FundPost(models.Model):
     collected_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     image = models.ImageField(upload_to="fund_images/", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
-class NGORegistration(models.Model):
-    organization_name = models.CharField(max_length=255)
-    official_email = models.EmailField(unique=True)
-    address = models.TextField()
-    type_of_ngo = models.CharField(max_length=255)
-    government_issued_id = models.FileField(upload_to='ngo_docs/')
-    social_link = models.URLField(blank=True, null=True)
-    contact_number = models.CharField(max_length=20)
-    password = models.CharField(max_length=128) 
-    organization_authority_name = models.CharField(max_length=255)
-    profile_picture = models.ImageField(upload_to='ngo_profiles/')
-    password = models.CharField(max_length=255)
-    extra_field_1 = models.CharField(max_length=255, blank=True, null=True)
-    extra_field_2 = models.CharField(max_length=255, blank=True, null=True)
-
-    def save(self, *args, **kwargs):
-        if not self.password.startswith('pbkdf2_'):  # Prevent re-hashing if already hashed
-            self.password = make_password(self.password)
-        super().save(*args, **kwargs)
-    
-    # ✅ Fix: Ensure `created_at` is automatically set
-    created_at = models.DateTimeField(default=now, blank=True)
-    def __str__(self):
-        return self.organization_name
-
-# ✅ Use a string reference to avoid circular import issues
 
 
 class Transaction(models.Model):
