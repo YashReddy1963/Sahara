@@ -8,12 +8,11 @@ export function SignUp() {
   const [userType, setUserType] = useState("user");
   const [formData, setFormData] = useState({
     username: "",
-    email: "",
     password: "",
     contact_number: "",
     profile_picture: null,
     organization_name: "",
-    official_email: "",
+    email: "",
     address: "",
     type_of_ngo: "",
     social_link: "",
@@ -163,7 +162,12 @@ export function SignUp() {
                 <Typography variant="small" color="blue-gray" className="-mb-3 font-medium">
                   Email
                 </Typography>
-                <Input name="official_email" size="lg" placeholder="ngo@mail.com" onChange={handleChange} />
+                <Input name="email" size="lg" placeholder="ngo@mail.com" onChange={handleChange} />
+
+                <Typography variant="small" color="blue-gray" className="-mb-3 font-medium">
+                  Password
+                </Typography>
+                <Input name="password" size="lg" placeholder="e.g, Password@123" onChange={handleChange} />
 
                 <Typography variant="small" color="blue-gray" className="-mb-3 font-medium">
                   Password

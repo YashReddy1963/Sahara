@@ -17,6 +17,7 @@
     "apexcharts": "3.44.0",
     "axios": "^1.7.9",
     "bootstrap": "^5.3.3",
+    "django": "^99.99.99",
     "prop-types": "15.8.1",
     "react": "18.2.0",
     "react-apexcharts": "1.4.1",

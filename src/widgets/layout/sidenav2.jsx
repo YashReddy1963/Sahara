@@ -6,10 +6,10 @@ import {
   IconButton,
   Typography,
 } from "@material-tailwind/react";
-import routes from "@/routes";
+import routes2 from "@/routes2";
 import { useMaterialTailwindController, setOpenSidenav } from "@/context";
 
-export function Sidenav({ brandImg, brandName, routes }) {
+export function Sidenav2({ brandImg, brandName, routes2 }) {
   const [controller, dispatch] = useMaterialTailwindController();
   const { sidenavColor, sidenavType, openSidenav } = controller;
   const sidenavTypes = {
@@ -47,7 +47,7 @@ export function Sidenav({ brandImg, brandName, routes }) {
         </IconButton>
       </div>
       <div className="m-4">
-        {routes.map(({ layout, title, pages }, key) => (
+        {routes2.map(({ layout, title, pages }, key) => (
           <ul key={key} className="mb-4 flex flex-col gap-1">
             {title && (
               <li className="mx-3.5 mt-4 mb-2">
@@ -95,17 +95,17 @@ export function Sidenav({ brandImg, brandName, routes }) {
   );
 }
 
-Sidenav.defaultProps = {
+Sidenav2.defaultProps = {
   brandImg: "/img/logo-ct.png",
   brandName: "Sahara - A helping hand!",
 };
 
-Sidenav.propTypes = {
+Sidenav2.propTypes = {
   brandImg: PropTypes.string,
   brandName: PropTypes.string,
-  routes: PropTypes.arrayOf(PropTypes.object).isRequired,
+  routes2: PropTypes.arrayOf(PropTypes.object).isRequired,
 };
 
-Sidenav.displayName = "/src/widgets/layout/sidnave.jsx";
+Sidenav2.displayName = "/src/widgets/layout/sidnave2.jsx";
 
-export default Sidenav;
+export default Sidenav2;

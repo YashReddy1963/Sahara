@@ -2,21 +2,21 @@ import { Routes, Route } from "react-router-dom";
 import { Cog6ToothIcon } from "@heroicons/react/24/solid";
 import { IconButton } from "@material-tailwind/react";
 import {
-  Sidenav,
+  Sidenav2,
   DashboardNavbar,
   Configurator,
 } from "@/widgets/layout";
-import routes from "@/routes";
+import routes2 from "@/routes2";
 import { useMaterialTailwindController, setOpenConfigurator } from "@/context";
 
-export function Dashboard() {
+export function Discover() {
   const [controller, dispatch] = useMaterialTailwindController();
   const { sidenavType } = controller;
 
   return (
     <div className="min-h-screen bg-blue-gray-50/50">
-      <Sidenav
-        routes={routes}
+      <Sidenav2
+        routes2={routes2}
         brandImg={
           sidenavType === "dark" ? "/img/logo-ct.png" : "/img/logo-ct-dark.png"
         }
@@ -24,22 +24,19 @@ export function Dashboard() {
       <div className="p-4 xl:ml-80">
         <DashboardNavbar />
         <Routes>
-          {routes.map(
+          {routes2.map(
             ({ layout, pages }) =>
-              layout === "dashboard" &&
+              layout === "discover" &&
               pages.map(({ path, element }) => (
                 <Route exact path={path} element={element} />
               ))
           )}
         </Routes>
-        <div className="text-blue-gray-600">
-        
-        </div>
       </div>
     </div>
   );
 }
 
-Dashboard.displayName = "/src/layout/dashboard.jsx";
+Discover.displayName = "/src/layout/discover.jsx";
 
-export default Dashboard;
+export default Discover;

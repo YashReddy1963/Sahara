@@ -5,12 +5,7 @@ from django.conf import settings
 from django.utils.timezone import now
 from django.db import models
 from django.contrib.auth.hashers import make_password
-
 import uuid
-
-
-
-
 
 class CustomUser(AbstractUser):
     email = models.EmailField(unique=True)
@@ -24,24 +19,17 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.email
-    
-    
-# class NGO(models.Model):
-#     name = models.CharField(max_length=255, unique=True)
-#     registration_number = models.CharField(max_length=100, unique=True)
-#     contact_email = models.EmailField(unique=True)
-#     phone_number = models.CharField(max_length=15)
-#     address = models.TextField()
-#     logo = models.ImageField(upload_to='ngo_logos/', null=True, blank=True)
-#     website = models.URLField(blank=True, null=True)
 
-#     def __str__(self):
-#         return self.name
-
+    #def generate_otp(self):
+        """Generate and store a 6-digit OTP"""
+    #    import random
+    #   self.otp_code = str(random.randint(100000, 999999))
+    #  self.save()
+    # return self.otp_code
 
 class NGORegistration(models.Model):
     organization_name = models.CharField(max_length=255)
-    official_email = models.EmailField(unique=True)
+    email = models.EmailField(unique=True)
     address = models.TextField()
     type_of_ngo = models.CharField(max_length=255)
     government_issued_id = models.TextField()
@@ -55,11 +43,10 @@ class NGORegistration(models.Model):
     extra_field_2 = models.CharField(max_length=255, blank=True, null=True)
 
     def save(self, *args, **kwargs):
-        if not self.password.startswith('pbkdf2_'):  # Prevent re-hashing if already hashed
+        if not self.password.startswith('pbkdf2_'): 
             self.password = make_password(self.password)
         super().save(*args, **kwargs)
     
-    # ✅ Fix: Ensure `created_at` is automatically set
     created_at = models.DateTimeField(default=now, blank=True)
     def __str__(self):
         return self.organization_name
@@ -83,7 +70,6 @@ class FundRequest(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.amount_requested} - {self.status}"
-
 
 
 class FundPost(models.Model):
@@ -115,41 +101,15 @@ class FundPost(models.Model):
     image = models.ImageField(upload_to="img/fund_images/", blank=True, null=True)  
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
-    def __str__(self):
-        return f"{self.title} - {self.ngo.username}"
-
- 
-class NGORegistration(models.Model):
-    organization_name = models.CharField(max_length=255)
-    official_email = models.EmailField(unique=True)
-    address = models.TextField()
-    type_of_ngo = models.CharField(max_length=255)
-    government_issued_id = models.CharField(max_length=255, null=True, blank=True)
-    social_link = models.URLField(blank=True, null=True)
-    contact_number = models.CharField(max_length=20)
-    password = models.CharField(max_length=128 ,null=True , blank=True) 
-    organization_authority_name = models.CharField(max_length=255)
-    profile_picture = models.ImageField(upload_to='ngo_profiles/')
-    extra_field_1 = models.CharField(max_length=255, blank=True, null=True)
-    extra_field_2 = models.CharField(max_length=255, blank=True, null=True)
-
-    def save(self, *args, **kwargs):
-        if not self.password.startswith('pbkdf2_'):  
-            self.password = make_password(self.password)
-        super().save(*args, **kwargs)
-    
-   
-    created_at = models.DateTimeField(default=now, blank=True)
     def _str_(self):
-        return self.organization_name
-
+        return f"{self.title} - {self.ngo.username}"
 
 class Transaction(models.Model):
     donor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="transactions")
     fund_post = models.ForeignKey(FundPost, on_delete=models.CASCADE, related_name="transactions")
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_method = models.CharField(max_length=50, choices=[('UPI', 'UPI'), ('Card', 'Card'), ('Net Banking', 'Net Banking')])
-    transaction_id = models.CharField(max_length=100, unique=True)  # Unique transaction reference
+    transaction_id = models.CharField(max_length=100, unique=True) 
     status = models.CharField(max_length=20, choices=[('Pending', 'Pending'), ('Success', 'Success'), ('Failed', 'Failed')], default='Pending')
     created_at = models.DateTimeField(default=now)
 
