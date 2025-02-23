@@ -170,6 +170,11 @@ export function SignUp() {
                 <Input name="password" size="lg" placeholder="e.g, Password@123" onChange={handleChange} />
 
                 <Typography variant="small" color="blue-gray" className="-mb-3 font-medium">
+                  Password
+                </Typography>
+                <Input name="password" size="lg" placeholder="e.g, Password@123" onChange={handleChange} />
+
+                <Typography variant="small" color="blue-gray" className="-mb-3 font-medium">
                   Profile/Logo
                 </Typography>
                 <Input name="profile_picture" size="lg" type="file" onChange={handleChange} />

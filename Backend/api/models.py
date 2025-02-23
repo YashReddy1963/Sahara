@@ -98,7 +98,7 @@ class FundPost(models.Model):
     description = models.TextField()
     target_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     collected_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, null=True, blank=True)
-    image = models.URLField(max_length=500, blank=True, null=True)  
+    image = models.ImageField(upload_to="img/fund_images/", blank=True, null=True)  
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     def _str_(self):
@@ -116,11 +116,35 @@ class Transaction(models.Model):
 
 
 class Donation(models.Model):
-    donor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)  # The user who donates
-    fund_post = models.ForeignKey("FundPost", on_delete=models.CASCADE)  # The fundraiser receiving the donation
-    amount = models.DecimalField(max_digits=10, decimal_places=2)  # Amount donated
-    payment_status = models.CharField(max_length=20, choices=[('PENDING', 'Pending'), ('SUCCESS', 'Success'), ('FAILED', 'Failed')], default='PENDING')  # Payment status
-    created_at = models.DateTimeField(auto_now_add=True)  # When the donation was made
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Donor (user who donated)
+    donor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='donations_made'
+    )
+
+    # Seeker (user who requested the fund)
+    seeker = models.ForeignKey(
+    settings.AUTH_USER_MODEL,
+    on_delete=models.CASCADE,
+    related_name='donations_received',
+    null=True,  # Allow NULL in the database
+    blank=True  # Allow empty in forms
+)
+
+
+    # Linked Fund Post
+    fund_post = models.ForeignKey('FundPost', on_delete=models.CASCADE, related_name='donations')
+
+    # Donation Details
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    transaction_id = models.CharField(max_length=255, unique=True)  # Unique transaction identifier
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def _str_(self):
+        return f"Donation of {self.amount} by {self.donor.username} to {self.seeker.username}"
 
 
 class NGOVerification(models.Model):
@@ -134,3 +158,26 @@ class Notification(models.Model):
     message = models.TextField()
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(default=now)
+
+
+
+
+class NGO(models.Model):
+    name = models.CharField(max_length=255)
+    email = models.EmailField(unique=True)
+    contact_number = models.CharField(max_length=20)
+
+    def __str__(self):
+        return self.name
+
+class DailyDonation(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    ngo = models.ForeignKey(NGO, on_delete=models.CASCADE)
+    date = models.DateField(default=now)  # Defaults to the current date
+    total_received = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
+
+    class Meta:
+        unique_together = ('ngo', 'date')  # Ensures one entry per NGO per day
+
+    def __str__(self):
+        return f"{self.ngo.name} - {self.date}: {self.total_received}"

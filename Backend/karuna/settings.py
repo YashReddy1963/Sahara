@@ -126,9 +126,9 @@ WSGI_APPLICATION = 'karuna.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'karuna',
+        'NAME': 'Sahara',
         'USER': 'postgres',
-        'PASSWORD': 'priti',
+        'PASSWORD': 'admin123',
         'HOST': 'localhost',
         'PORT': '5432',
     },
