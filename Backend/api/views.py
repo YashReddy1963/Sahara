@@ -9,7 +9,7 @@ from django.utils.decorators import method_decorator
 from .models import CustomUser
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login
-from .models import FundPost, Donation, FundRequest,FundPost
+from .models import FundPost, Donation, FundRequest,FundPost, DailyDonation
 from django.utils.timezone import now
 from .models import Notification
 from django.views import View
@@ -39,7 +39,7 @@ from django.contrib.auth import get_user_model
 from django.views.decorators.http import require_POST
 
 
-from .models import DailyDonation, NGO
+from .models import  NGO
 from decimal import Decimal
 
 User = get_user_model()  # Get the custom User model
@@ -96,70 +96,51 @@ class CreateFundPostView(View):
             return JsonResponse({"error": str(e)}, status=500)
 
 
+
+
 @csrf_exempt
 def register_user(request):
     if request.method == 'POST':
         try:
-            data = request.POST
-
+            # Check if request contains JSON or form-data
+            if request.content_type == 'application/json':
+                data = json.loads(request.body)
+            else:
+                data = request.POST  # Handles form-data
+            
+            # Extracting fields
             username = data.get('username', '').strip()
             email = data.get('email', '').strip().lower()
             password = data.get('password', '').strip()
             contact_number = data.get('contact_number', '').strip()
-            profile_picture = request.FILES.get('profile_picture')  
+            profile_picture = request.FILES.get('profile_picture')
 
+            # Validation check
             if not username or not email or not password or not contact_number:
                 return JsonResponse({'error': 'Username, email, password, and contact number are required'}, status=400)
 
-            # Check if email already exists
-            user = CustomUser.objects.filter(email=email).first()
-            if user:
-                if not user.otp_verified:
-                    otp_code = str(random.randint(100000, 999999))
-                    user.otp_code = otp_code
-                    user.save()
-
-                    send_mail(
-                        subject="Your OTP Code",
-                        message=f"Your OTP code is {otp_code}",
-                        from_email="your_email@example.com",
-                        recipient_list=[email],
-                        fail_silently=False,
-                    )
-
-                    return JsonResponse({'message': 'OTP resent. Please verify.'}, status=200)
-
+            # Check if user already exists
+            if CustomUser.objects.filter(email=email).exists():
                 return JsonResponse({'error': 'User with this email already exists'}, status=400)
 
-            # Generate OTP for new user
-            otp_code = str(random.randint(100000, 999999))
-
+            # Save profile picture if provided
+            picture_path = None
             if profile_picture:
-                picture_path = default_storage.save(f'profile_pictures/{profile_picture.name}', ContentFile(profile_picture.read()))
+                picture_path = default_storage.save(f'profile_pictures/{uuid.uuid4()}_{profile_picture.name}', ContentFile(profile_picture.read()))
 
-
+            # Create user
             user = CustomUser.objects.create(
                 username=username,
                 email=email,
                 password=make_password(password),
                 contact_number=contact_number,
-                profile_picture=picture_path,  # Fixed variable name
-                otp_code=otp_code,
-                otp_verified=False
+                profile_picture=picture_path  # Save profile picture path
             )
 
-            send_mail(
-                subject="Your OTP Code",
-                message=f"Your OTP code is {otp_code}",
-                from_email="your_email@example.com",
-                recipient_list=[email],
-                fail_silently=False,
-            )
-
-            return JsonResponse({'message': 'User registered successfully. OTP sent.', 'user_id': user.id}, status=201)
+            return JsonResponse({'message': 'User registered successfully.', 'user_id': user.id}, status=201)
 
         except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+            return JsonResponse({'error': 'Invalid JSON format'}, status=400)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
 
@@ -186,7 +167,7 @@ def ngo_registration(request):
             extra_field_1 = data.get('extra_field_1', '').strip()
             extra_field_2 = data.get('extra_field_2', '').strip()
 
-            government_issued_id = data.get('government_issued_id').strip()
+            government_issued_id = data.get('government_issues_id', '')
             profile_picture = request.FILES.get('profile_picture')
 
             if not all([organization_name, official_email, address, type_of_ngo, contact_number, organization_authority_name]):
@@ -199,9 +180,10 @@ def ngo_registration(request):
 
             
             if NGORegistration.objects.filter(official_email=official_email).exists():
-                return JsonResponse({'error': 'NGO with this email already exists'}, status=400)
-            if not government_issued_id or not profile_picture:
-                return JsonResponse({'error': 'Government-issued ID and profile picture are required'}, status=400)
+                return JsonResponse({'error': 'NGO with this email already exists'}, status=400)            
+
+            if not profile_picture:
+                return JsonResponse({'error': 'Profile picture are required'}, status=400)
 
 
             hashed_password = make_password(password) 
@@ -219,15 +201,19 @@ def ngo_registration(request):
                 extra_field_1=extra_field_1,
                 extra_field_2=extra_field_2
             )
-            otp = random.randint(100000, 999999)
-            send_mail(
-                'NGO Registration OTP Verification',
-                f'Hello {organization_name},\n\nYour OTP for NGO registration is: {otp}\n\nPlease enter this OTP to verify your NGO registration.',
-                'your-email@example.com',  
-                [official_email],
-                fail_silently=False
-            )
 
+            # Step 1: Generate a 6-digit OTP
+            #otp = random.randint(100000, 999999)
+
+            #sharing opt via email
+           #send_mail(
+           #    'NGO Registration OTP Verification',
+           #    f'Hello {organization_name},\n\nYour OTP for NGO registration is: {otp}\n\nPlease enter this OTP to verify your NGO registration.',
+           #    'your-email@example.com',
+           #    [official_email],
+           #    fail_silently=False
+           #)
+           
             return JsonResponse({'message': 'NGO registered successfully. OTP sent for verification.', 'ngo_id': ngo.id}, status=201)
 
         except Exception as e:
@@ -245,45 +231,40 @@ def login_view(request):
             data = json.loads(request.body)
             email = data.get("email", "").strip().lower()
             password = data.get("password", "").strip()
-            otp_code = data.get("otp_code", "").strip()
 
             if not email or not password:
                 return JsonResponse({"error": "Email and password are required."}, status=400)
 
-            # Authenticate user with email
+            # Check in CustomUser table
             user = CustomUser.objects.filter(email=email).first()
+            if user and user.check_password(password):
+                login(request, user)
+                refresh = RefreshToken.for_user(user)
+                return JsonResponse({
+                    "message": "Login successful",
+                    "user_id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "access_token": str(refresh.access_token),
+                    "refresh_token": str(refresh),
+                    "redirect_url": "/user-dashboard"  # Redirect user
+                }, status=200)
 
-            if user is None or not user.check_password(password):
-                return JsonResponse({"error": "Invalid credentials"}, status=401)
+            # Check in NgoRegistration table
+            ngo_user = NGORegistration.objects.filter(email=email).first()
+            if ngo_user and ngo_user.check_password(password):  # Assuming NgoRegistration has password field
+                refresh = RefreshToken.for_user(ngo_user)
+                return JsonResponse({
+                    "message": "Login successful",
+                    "user_id": ngo_user.id,
+                    "username": ngo_user.username,
+                    "email": ngo_user.email,
+                    "access_token": str(refresh.access_token),
+                    "refresh_token": str(refresh),
+                    "redirect_url": "/ngo-dashboard"  # Redirect NGO user
+                }, status=200)
 
-            # Check OTP verification
-            if not user.otp_verified:
-                if not otp_code:
-                    return JsonResponse({"error": "OTP verification required. Please enter the OTP."}, status=403)
-
-                if otp_code != user.otp_code:
-                    return JsonResponse({"error": "Invalid OTP."}, status=403)
-
-                # Mark OTP as verified
-                user.otp_verified = True
-                user.otp_code = None  # Clear OTP after successful verification
-                user.save()
-
-            # Log the user in
-            login(request, user)
-
-            # Generate JWT tokens
-            refresh = RefreshToken.for_user(user)
-            access_token = str(refresh.access_token)
-
-            return JsonResponse({
-                "message": "Login successful",
-                "user_id": user.id,
-                "username": user.username,
-                "email": user.email,
-                "access_token": access_token,
-                "refresh_token": str(refresh),
-            }, status=200)
+            return JsonResponse({"error": "Invalid credentials"}, status=401)
 
         except json.JSONDecodeError:
             return JsonResponse({"error": "Invalid JSON format"}, status=400)
@@ -291,8 +272,6 @@ def login_view(request):
             return JsonResponse({"error": str(e)}, status=500)
 
     return JsonResponse({"error": "Invalid request method."}, status=405)
-
-
 
 
 
@@ -478,43 +457,69 @@ class FundPostDetailView(View):
     
 
 
-@csrf_exempt
-def add_donation(request):
-    if request.method == "POST":
+@method_decorator(csrf_exempt, name='dispatch')
+# @method_decorator(login_required, name='dispatch')
+class CreateDonationView(View):
+    def post(self, request, *args, **kwargs):
         try:
             data = json.loads(request.body)
-            ngo_id = data.get("ngo_id")
-            amount = Decimal(data.get("amount"))
 
-            if not ngo_id or amount is None:
-                return JsonResponse({"error": "NGO ID and amount are required"}, status=400)
+            donor_username = data.get("donor_username")
+            fund_post_title = data.get("fund_post_title")
+            amount = data.get("amount")
+            transaction_id = data.get("transaction_id")
 
+            # Validate input
+            if not all([donor_username, fund_post_title, amount, transaction_id]):
+                return JsonResponse({"error": "All fields are required."}, status=400)
+
+            # Fetch Donor
             try:
-                ngo = NGO.objects.get(id=ngo_id)
-            except NGO.DoesNotExist:
-                return JsonResponse({"error": "NGO not found"}, status=404)
+                donor = User.objects.get(username=donor_username)
+            except User.DoesNotExist:
+                return JsonResponse({"error": "Donor not found."}, status=404)
 
-            today = now().date()
+            # Fetch Fund Post by Title
+            try:
+                fund_post = FundPost.objects.get(title=fund_post_title)
+                seeker = fund_post.user
+            except FundPost.DoesNotExist:
+                return JsonResponse({"error": "Fund post not found."}, status=404)
 
-            # Check if an entry exists for today
-            donation_entry, created = DailyDonation.objects.get_or_create(ngo=ngo, date=today)
-            donation_entry.total_received += amount
-            donation_entry.save()
+            # Prevent self-donation
+            if donor == seeker:
+                return JsonResponse({"error": "You cannot donate to your own fund post."}, status=400)
 
-            return JsonResponse({"message": "Donation added successfully", "total_received": float(donation_entry.total_received)}, status=201)
+            # Create Donation
+            donation = Donation.objects.create(
+                donor=donor,
+                seeker=seeker,
+                fund_post=fund_post,
+                amount=amount,
+                transaction_id=transaction_id
+            )
+
+            return JsonResponse({
+                "message": "Donation successful!",
+                "donation_id": str(donation.id),
+                "donor": donor.username,
+                "seeker": seeker.username,
+                "fund_post": fund_post.title,
+                "amount": str(donation.amount),
+                "transaction_id": donation.transaction_id
+            }, status=201)
 
         except json.JSONDecodeError:
-            return JsonResponse({"error": "Invalid JSON format"}, status=400)
-
+            return JsonResponse({"error": "Invalid JSON format."}, status=400)
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
 
-    return JsonResponse({"error": "Invalid request method"}, status=405)
 
+import uuid
 
-@csrf_exempt
-def get_daily_donations(request, ngo_id):
-    if request.method == "GET":
+@method_decorator(csrf_exempt, name='dispatch')
+class GetDailyDonationsView(View):
+    def get(self, request, ngo_id, *args, **kwargs):
         try:
             try:
                 ngo = NGO.objects.get(id=ngo_id)
@@ -528,5 +533,126 @@ def get_daily_donations(request, ngo_id):
 
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
+
+
+
+@csrf_exempt
+def user_profile(request, user_id):
+    user = get_object_or_404(CustomUser, id=user_id)
+
+    if request.method == 'GET':
+        # Fetch user profile
+        return JsonResponse({
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "contact_number": user.contact_number,
+            "profile_picture": user.profile_picture.url if user.profile_picture else None
+        }, status=200)
+
+    elif request.method == 'PUT':
+        # Update user profile
+        try:
+            data = json.loads(request.body.decode('utf-8'))
+            user.username = data.get('username', user.username)
+            user.contact_number = data.get('contact_number', user.contact_number)
+            user.save()
+
+            return JsonResponse({"message": "User profile updated successfully"}, status=200)
+
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON format"}, status=400)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+
+
+@csrf_exempt
+def ngo_profile(request, ngo_id):
+    ngo = get_object_or_404(NGORegistration, id=ngo_id)
+
+    if request.method == 'GET':
+        # Fetch NGO profile
+        return JsonResponse({
+            "id": ngo.id,
+            "organization_name": ngo.organization_name,
+            "email": ngo.email,
+            "contact_number": ngo.contact_number,
+            "address": ngo.address,
+            "type_of_ngo": ngo.type_of_ngo,
+            "government_issued_id": ngo.government_issued_id,
+            "social_link": ngo.social_link,
+            "organization_authority_name": ngo.organization_authority_name,
+            "profile_picture": ngo.profile_picture.url if ngo.profile_picture else None,
+            "extra_field_1": ngo.extra_field_1,
+            "extra_field_2": ngo.extra_field_2,
+            "created_at": ngo.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+        }, status=200)
+
+    elif request.method == 'PUT':
+        # Update NGO profile
+        try:
+            data = json.loads(request.body.decode('utf-8'))
+            ngo.organization_name = data.get('organization_name', ngo.organization_name)
+            ngo.email = data.get('email', ngo.email)
+            ngo.contact_number = data.get('contact_number', ngo.contact_number)
+            ngo.address = data.get('address', ngo.address)
+            ngo.type_of_ngo = data.get('type_of_ngo', ngo.type_of_ngo)
+            ngo.government_issued_id = data.get('government_issued_id', ngo.government_issued_id)
+            ngo.social_link = data.get('social_link', ngo.social_link)
+            ngo.organization_authority_name = data.get('organization_authority_name', ngo.organization_authority_name)
+            ngo.extra_field_1 = data.get('extra_field_1', ngo.extra_field_1)
+            ngo.extra_field_2 = data.get('extra_field_2', ngo.extra_field_2)
+            ngo.save()
+
+            return JsonResponse({"message": "NGO profile updated successfully"}, status=200)
+
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON format"}, status=400)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+
+
+@csrf_exempt
+def ngo_profile(request, ngo_id):
+    ngo = get_object_or_404(NGORegistration, id=ngo_id)
+
+    if request.method == 'GET':
+        # Fetch NGO profile
+        return JsonResponse({
+            "id": ngo.id,
+            "organization_name": ngo.organization_name,
+            "official_email": ngo.official_email,
+            "contact_number": ngo.contact_number,
+            "address": ngo.address,
+            "type_of_ngo": ngo.type_of_ngo,
+            "government_issued_id": ngo.government_issued_id,
+            "social_link": ngo.social_link,
+            "organization_authority_name": ngo.organization_authority_name,
+            "profile_picture": ngo.profile_picture.url if ngo.profile_picture else None,
+            "extra_field_1": ngo.extra_field_1,
+            "extra_field_2": ngo.extra_field_2,
+            "created_at": ngo.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+        }, status=200)
+
+    elif request.method == 'PUT':
+        # Update NGO profile
+        try:
+            data = json.loads(request.body.decode('utf-8'))
+            ngo.organization_name = data.get('organization_name', ngo.organization_name)
+            ngo.email = data.get('email', ngo.email)
+            ngo.contact_number = data.get('contact_number', ngo.contact_number)
+            ngo.address = data.get('address', ngo.address)
+            ngo.type_of_ngo = data.get('type_of_ngo', ngo.type_of_ngo)
+            ngo.government_issued_id = data.get('government_issued_id', ngo.government_issued_id)
+            ngo.social_link = data.get('social_link', ngo.social_link)
+            ngo.organization_authority_name = data.get('organization_authority_name', ngo.organization_authority_name)
+            ngo.extra_field_1 = data.get('extra_field_1', ngo.extra_field_1)
+            ngo.extra_field_2 = data.get('extra_field_2', ngo.extra_field_2)
+            ngo.save()
+
+            return JsonResponse({"message": "NGO profile updated successfully"}, status=200)
+
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON format"}, status=400)
 
     return JsonResponse({"error": "Invalid request method"}, status=405)

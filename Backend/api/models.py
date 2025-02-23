@@ -13,26 +13,56 @@ import uuid
 
 
 class CustomUser(AbstractUser):
-
-
     email = models.EmailField(unique=True)
     contact_number = models.CharField(max_length=15, null=True, blank=True)
     profile_picture = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)
-    otp_code = models.CharField(max_length=6, blank=True, null=True)
-    otp_verified = models.BooleanField(default=False)
+    #otp_code = models.CharField(max_length=6, blank=True, null=True)
+    #otp_verified = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
 
     def __str__(self):
         return self.email
+    
+    
+# class NGO(models.Model):
+#     name = models.CharField(max_length=255, unique=True)
+#     registration_number = models.CharField(max_length=100, unique=True)
+#     contact_email = models.EmailField(unique=True)
+#     phone_number = models.CharField(max_length=15)
+#     address = models.TextField()
+#     logo = models.ImageField(upload_to='ngo_logos/', null=True, blank=True)
+#     website = models.URLField(blank=True, null=True)
 
-    def generate_otp(self):
-        """Generate and store a 6-digit OTP"""
-        import random
-        self.otp_code = str(random.randint(100000, 999999))
-        self.save()
-        return self.otp_code
+#     def __str__(self):
+#         return self.name
+
+
+class NGORegistration(models.Model):
+    organization_name = models.CharField(max_length=255)
+    official_email = models.EmailField(unique=True)
+    address = models.TextField()
+    type_of_ngo = models.CharField(max_length=255)
+    government_issued_id = models.TextField()
+    social_link = models.URLField(blank=True, null=True)
+    contact_number = models.CharField(max_length=20)
+    password = models.CharField(max_length=128) 
+    organization_authority_name = models.CharField(max_length=255)
+    profile_picture = models.ImageField(upload_to='ngo_profiles/')
+    password = models.CharField(max_length=255)
+    extra_field_1 = models.CharField(max_length=255, blank=True, null=True)
+    extra_field_2 = models.CharField(max_length=255, blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        if not self.password.startswith('pbkdf2_'):  # Prevent re-hashing if already hashed
+            self.password = make_password(self.password)
+        super().save(*args, **kwargs)
+    
+    # ✅ Fix: Ensure `created_at` is automatically set
+    created_at = models.DateTimeField(default=now, blank=True)
+    def __str__(self):
+        return self.organization_name
 
 
 class Meta:
@@ -126,11 +156,35 @@ class Transaction(models.Model):
 
 
 class Donation(models.Model):
-    donor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)  # The user who donates
-    fund_post = models.ForeignKey("FundPost", on_delete=models.CASCADE)  # The fundraiser receiving the donation
-    amount = models.DecimalField(max_digits=10, decimal_places=2)  # Amount donated
-    payment_status = models.CharField(max_length=20, choices=[('PENDING', 'Pending'), ('SUCCESS', 'Success'), ('FAILED', 'Failed')], default='PENDING')  # Payment status
-    created_at = models.DateTimeField(auto_now_add=True)  # When the donation was made
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Donor (user who donated)
+    donor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='donations_made'
+    )
+
+    # Seeker (user who requested the fund)
+    seeker = models.ForeignKey(
+    settings.AUTH_USER_MODEL,
+    on_delete=models.CASCADE,
+    related_name='donations_received',
+    null=True,  # Allow NULL in the database
+    blank=True  # Allow empty in forms
+)
+
+
+    # Linked Fund Post
+    fund_post = models.ForeignKey('FundPost', on_delete=models.CASCADE, related_name='donations')
+
+    # Donation Details
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    transaction_id = models.CharField(max_length=255, unique=True)  # Unique transaction identifier
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def _str_(self):
+        return f"Donation of {self.amount} by {self.donor.username} to {self.seeker.username}"
 
 
 class NGOVerification(models.Model):
@@ -159,11 +213,11 @@ class NGO(models.Model):
 class DailyDonation(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     ngo = models.ForeignKey(NGO, on_delete=models.CASCADE)
-    date = models.DateField(default=now)  # Defaults to current date
+    date = models.DateField(default=now)  # Defaults to the current date
     total_received = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
 
     class Meta:
-        unique_together = ('ngo', 'date')  # Ensure one entry per day per NGO
+        unique_together = ('ngo', 'date')  # Ensures one entry per NGO per day
 
     def __str__(self):
         return f"{self.ngo.name} - {self.date}: {self.total_received}"
