@@ -15,7 +15,7 @@ import {
       layout: "discover",
       pages: [
         {
-          icicon: <HomeIcon {...icon} />,
+          icon: <HomeIcon {...icon} />,
           name: "home",
           path: "/home",
           element: <Home />,
