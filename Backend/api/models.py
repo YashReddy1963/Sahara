@@ -56,21 +56,26 @@ class Meta:
         db_table = "api_customuser"
 
 class FundRequest(models.Model):
-    STATUS_CHOICES = [
-        ('Pending', 'Pending'),
-        ('Approved', 'Approved'),
-        ('Rejected', 'Rejected'),
-    ]
-
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    reason = models.TextField()
+    ngo = models.ForeignKey(NGORegistration, on_delete=models.CASCADE, null=True, blank=True)
     amount_requested = models.DecimalField(max_digits=10, decimal_places=2)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Pending')
+    title = models.CharField(max_length=255,null=True, blank=True)
+    image = models.ImageField(upload_to='fund_requests/', null=True, blank=True) 
+    reason = models.TextField()
+    status = models.CharField(
+        max_length=50,
+        choices=[
+            ("pending", "Pending"),
+            ("approved", "Approved"),
+            ("rejected", "Rejected")
+        ],
+        default="pending"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return f"{self.user.username} - {self.amount_requested} - {self.status}"
-
+    def str(self):
+        return f"Request {self.id} by {self.user.username}"
 
 class FundPost(models.Model):
     id = models.BigAutoField(primary_key=True)  

@@ -9,7 +9,7 @@ from django.utils.decorators import method_decorator
 from .models import CustomUser
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login
-from .models import FundPost, Donation, FundRequest
+from .models import FundPost, Donation, FundRequest, NGORegistration
 from django.utils.timezone import now
 from .models import Notification
 from django.views import View
@@ -17,14 +17,19 @@ from django.shortcuts import get_object_or_404
 import random
 from django.core.mail import send_mail
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import NGORegistration
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.exceptions import NotAuthenticated, AuthenticationFailed
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
+# User registration view
 @csrf_exempt
 def register_user(request):
     if request.method == 'POST':
@@ -92,7 +97,7 @@ def register_user(request):
 
     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
-
+#NGO registration view
 @csrf_exempt
 def ngo_registration(request):
     if request.method == 'POST':
@@ -172,7 +177,7 @@ def ngo_registration(request):
     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
 
-
+# Login view
 @csrf_exempt
 def login_view(request):
     if request.method == "POST":
@@ -226,8 +231,162 @@ def login_view(request):
     return JsonResponse({"error": "Invalid request method."}, status=405)
 
 
+# View for creating fund request
+class FundRequestView(APIView):
+    permission_classes = [IsAuthenticated] 
+    def post(self, request):
+        print("Received Data:", request.data) 
+        print("Received Files:", request.FILES) 
+        try:
+            if not request.user or not request.user.is_authenticated:
+                raise NotAuthenticated("User is not authenticated or token is invalid!")
 
+            data = request.data
+            reason = data.get('reason')
+            amount = data.get('amount')
+            ngo_name = data.get('ngo_name')
+            title = data.get('title')
+            image = request.FILES.get('image') 
 
+            required_fields = [reason, amount, ngo_name, title, image]
+
+            if not all(required_fields):
+                return Response({'error': 'All fields (reason, amount, ngo_name, title, image) are required!', }, status=400)
+
+            
+            try:
+                amount = float(amount)
+                if amount <= 0:
+                    return Response({'error': 'Amount must be greater than 0!'}, status=400)
+            except ValueError:
+                return Response({'error': 'Amount must be a valid number!'}, status=400)
+
+            ngo_qs = NGORegistration.objects.filter(organization_name=ngo_name)
+            if not ngo_qs.exists():
+                return Response({'error': f'NGO with name "{ngo_name}" not found!'}, status=404)
+            
+            ngo = ngo_qs.first()  
+
+            fund_request = FundRequest.objects.create(
+                user=request.user,
+                ngo=ngo,
+                amount_requested=amount,
+                reason=reason,
+                title=title,
+                image=image
+            )
+
+            image_url = request.build_absolute_uri(fund_request.image.url) if fund_request.image else None
+
+            return Response({
+                'message': 'Fund request created successfully!',
+                'user': request.user.username,
+                'ngo': ngo_name,
+                'amount_requested': str(fund_request.amount_requested),
+                'reason': fund_request.reason,
+                'status': fund_request.status,
+                'image_url': image_url,
+                'created_at': fund_request.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            }, status=201)
+
+        except InvalidToken as e:
+            return Response({'error': 'Invalid token!', 'details': str(e)}, status=401)
+
+        except TokenError as e:
+            return Response({'error': 'Token error!', 'details': str(e)}, status=401)
+
+        except AuthenticationFailed as e:
+            return Response({'error': 'Authentication failed!', 'details': str(e)}, status=401)
+
+        except NotAuthenticated as e:
+            return Response({'error': 'User not authenticated!', 'details': str(e)}, status=401)
+
+        except Exception as e:
+            return Response({'error': 'An unexpected error occurred!', 'details': str(e)}, status=500)
+
+# View for creating posts for funds
+User = get_user_model()
+@method_decorator(csrf_exempt, name='dispatch')
+class CreateFundPostView(View):
+    def post(self, request):
+        try:
+            if not request.user.is_authenticated:
+                return JsonResponse({"error": "Authentication required"}, status=401)
+
+            data = request.POST
+            ngo_id = data.get("id")
+            ngo_name = data.get("ngo_name")
+            title = data.get("title")
+            description = data.get("description")
+            target_amount = data.get("target_amount")
+            image = request.FILES.get("image") 
+            image_url = data.get("image_url") 
+
+            if not all([title, description, target_amount]):
+                return JsonResponse({"error": "All fields are required."}, status=400)
+
+            if ngo_id:
+                try:
+                    ngo = User.objects.get(id=ngo_id)
+                except User.DoesNotExist:
+                    return JsonResponse({"error": "NGO not found or invalid"}, status=404)
+
+            # Create Fund Post
+            fund_post = FundPost.objects.create(
+                user=request.user,
+                ngo_name=ngo_name,
+                title=title,
+                description=description,
+                target_amount=target_amount,
+                image=image if image else image_url,
+            )
+
+            return JsonResponse({
+                "message": "Fund post created successfully!",
+                "fund_post_id": fund_post.id,
+                "image_url": fund_post.image if fund_post.image else None 
+            }, status=201)
+
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON format"}, status=400)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+# View for getting the details about the fund post
+class FundPostDetailView(View):
+    def get(self, request, post_id=None):
+        if post_id:
+            fund_post = get_object_or_404(FundPost, id=post_id)
+            data = {
+                "id": fund_post.id,
+                "title": fund_post.title,
+                "description": fund_post.description,
+                "target_amount": fund_post.target_amount,
+                "collected_amount": fund_post.collected_amount,
+                "ngo_name": fund_post.ngo_name,
+                "created_at": fund_post.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                "image": fund_post.image.url if fund_post.image and fund_post.image.name else None,  
+            }
+            return JsonResponse(data, safe=False)
+        
+        # Fetch all fund posts
+        fund_posts = FundPost.objects.all()
+        data = [
+            {
+                "id": post.id,
+                "title": post.title,
+                "description": post.description,
+                "target_amount": post.target_amount,
+                "collected_amount": post.collected_amount,
+                "ngo_name": post.ngo_name,
+                "created_at": post.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                "image": post.image.url if post.image and post.image.name else None,  
+            }
+            for post in fund_posts
+        ]
+        return JsonResponse(data, safe=False)
+    
+# View of donation for the people 
 @csrf_exempt
 @login_required
 def donate(request):
@@ -269,55 +428,7 @@ def donate(request):
     return JsonResponse({"error": "Invalid request method."}, status=405)
 
 
-User = get_user_model()
-@method_decorator(csrf_exempt, name='dispatch')
-
-class CreateFundPostView(View):
-    def post(self, request):
-        try:
-            if not request.user.is_authenticated:
-                return JsonResponse({"error": "Authentication required"}, status=401)
-
-            data = request.POST
-            ngo_id = data.get("id")
-            ngo_name = data.get("ngo_name")
-            title = data.get("title")
-            description = data.get("description")
-            target_amount = data.get("target_amount")
-            image = request.FILES.get("image")  # If an image is uploaded
-            image_url = data.get("image_url")  # If an image URL is provided
-
-            if not all([title, description, target_amount]):
-                return JsonResponse({"error": "All fields are required."}, status=400)
-
-            if ngo_id:
-                try:
-                    ngo = User.objects.get(id=ngo_id)
-                except User.DoesNotExist:
-                    return JsonResponse({"error": "NGO not found or invalid"}, status=404)
-
-            # Create Fund Post
-            fund_post = FundPost.objects.create(
-                user=request.user,
-                ngo_name=ngo_name,
-                title=title,
-                description=description,
-                target_amount=target_amount,
-                image=image if image else image_url,  # ✅ Support both file and URL
-            )
-
-            return JsonResponse({
-                "message": "Fund post created successfully!",
-                "fund_post_id": fund_post.id,
-                "image_url": fund_post.image if fund_post.image else None  # ✅ Include the image in response
-            }, status=201)
-
-        except json.JSONDecodeError:
-            return JsonResponse({"error": "Invalid JSON format"}, status=400)
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
-
-
+# Views for getting the stats
 def ngo_stats(request, ngo_id):
     try:
         # Get the NGO
@@ -350,6 +461,7 @@ def ngo_stats(request, ngo_id):
         return JsonResponse({"error": "NGO not found"}, status=404)
     
 
+# Notification view
 @method_decorator(login_required, name="dispatch")
 class NotificationView(View):
     def get(self, request):
@@ -365,37 +477,3 @@ class NotificationView(View):
         ]
         return JsonResponse({"notifications": data}, safe=False)
     
-
-
-class FundPostDetailView(View):
-    def get(self, request, post_id=None):
-        if post_id:
-            fund_post = get_object_or_404(FundPost, id=post_id)
-            data = {
-                "id": fund_post.id,
-                "title": fund_post.title,
-                "description": fund_post.description,
-                "target_amount": fund_post.target_amount,
-                "collected_amount": fund_post.collected_amount,
-                "ngo_name": fund_post.ngo_name,
-                "created_at": fund_post.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-                "image": fund_post.image.url if fund_post.image and fund_post.image.name else None,  # ✅ Fixed
-            }
-            return JsonResponse(data, safe=False)
-        
-        # Fetch all fund posts
-        fund_posts = FundPost.objects.all()
-        data = [
-            {
-                "id": post.id,
-                "title": post.title,
-                "description": post.description,
-                "target_amount": post.target_amount,
-                "collected_amount": post.collected_amount,
-                "ngo_name": post.ngo_name,
-                "created_at": post.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-                "image": post.image.url if post.image and post.image.name else None,  # ✅ Fixed
-            }
-            for post in fund_posts
-        ]
-        return JsonResponse(data, safe=False)
