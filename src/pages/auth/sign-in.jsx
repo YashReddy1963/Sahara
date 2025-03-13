@@ -10,36 +10,6 @@ import { useState } from "react";
 
 export function SignIn() {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({ email: "", password: "" });
-  const [error, setError] = useState("");
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(""); // Reset error message
-
-    try {
-      const response = await axios.post("http://localhost:8000/login/", formData, {
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (response.status === 200) {
-        const { access_token, redirect_url } = response.data;
-
-        // Store token in local storage
-        localStorage.setItem("access_token", access_token);
-
-        // Redirect based on user role
-        navigate(redirect_url);
-      }
-    } catch (err) {
-      setError(err.response?.data?.error || "An error occurred. Please try again.");
-    }
-  };
-
   return (
     <section className="m-8 flex gap-4">
       <div className="w-full lg:w-3/5 mt-24">
@@ -49,7 +19,7 @@ export function SignIn() {
             Select your role and enter your details to log in.
           </Typography>
         </div>
-        <form onSubmit={handleSubmit} className="mt-8 mb-2 mx-auto w-80 max-w-screen-lg lg:w-1/2">
+        <form className="mt-8 mb-2 mx-auto w-80 max-w-screen-lg lg:w-1/2">
           <div className="mb-1 flex flex-col gap-6">
             <Typography variant="small" color="blue-gray" className="-mb-3 font-medium">
               Your email
@@ -59,8 +29,7 @@ export function SignIn() {
               name="email"
               placeholder="name@mail.com"
               className=" !border-t-blue-gray-200 focus:!border-t-gray-900"
-              onChange={handleChange}
-              required
+              
             />
             <Typography variant="small" color="blue-gray" className="-mb-3 font-medium">
               Password
@@ -71,11 +40,10 @@ export function SignIn() {
               name="password"
               placeholder="********"
               className=" !border-t-blue-gray-200 focus:!border-t-gray-900"
-              onChange={handleChange}
-              required
+              
             />
           </div>
-          {error && <Typography color="red" className="text-center mt-2">{error}</Typography>}
+          <Typography color="red" className="text-center mt-2">{}</Typography>
           <Button type="submit" className="mt-6" fullWidth>
             Sign In
           </Button>

@@ -19,7 +19,7 @@ import {
             <div className="mb-1 flex flex-col gap-6">
               <Input
                 size="lg"
-                placeholder="name@mail.com"
+                placeholder="Enter the OTP"
                 className=" !border-t-blue-gray-200 focus:!border-t-gray-900"
                 labelProps={{
                   className: "before:content-none after:content-none",
